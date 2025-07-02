@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Live Host</title>
+  <style>
+    body {
+      background: #181c20;
+      color: #e0e6ed;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .branding {
+      margin-top: 1.5em;
+      font-size: 2em;
+      font-weight: bold;
+      color: #4fd1c5;
+      letter-spacing: 2px;
+    }
+    .main {
+      display: flex;
+      flex-direction: row;
+      width: 100vw;
+      max-width: 1200px;
+      justify-content: center;
+      align-items: flex-start;
+      margin-top: 1em;
+    }
+    .video-panel {
+      flex: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .video-aspect {
+      position: relative;
+      width: 40vw;
+      max-width: 600px;
+      aspect-ratio: 16 / 9;
+      background: #222;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+      border: 2px solid #2d3748;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      margin: 1em 0 1em 0;
+    }
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: #222;
+      border-radius: 16px;
+      display: block;
+    }
+    .controls, .meta-controls {
+      display: flex;
+      gap: 1em;
+      margin-bottom: 1em;
+      flex-wrap: wrap;
+    }
+    button, select, input[type="text"], textarea {
+      background: #4fd1c5;
+      color: #181c20;
+      border: none;
+      border-radius: 6px;
+      padding: 0.5em 1em;
+      font-size: 1em;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:disabled {
+      background: #2d3748;
+      color: #888;
+      cursor: not-allowed;
+    }
+    .chat-box {
+      background: #181c20;
+      border-radius: 8px;
+      padding: 0.5em;
+      height: 200px;
+      overflow-y: auto;
+      font-size: 1em;
+      margin-bottom: 0.5em;
+    }
+    .chat-input {
+      display: flex;
+      gap: 0.5em;
+    }
+    .emoji-panel {
+      display: flex;
+      gap: 0.5em;
+      flex-wrap: wrap;
+      margin-bottom: 0.5em;
+    }
+    .emoji-btn {
+      font-size: 1.5em;
+      background: none;
+      border: none;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+    .emoji-btn:hover {
+      transform: scale(1.2);
+    }
+    .viewer-count {
+      font-size: 1.1em;
+      color: #4fd1c5;
+      margin-bottom: 0.5em;
+    }
+    .theme-toggle {
+      margin-top: 1em;
+      align-self: flex-end;
+    }
+    .recording-indicator {
+      color: #ff4d4f;
+      font-weight: bold;
+      margin-left: 1em;
+    }
+  </style>
+</head>
+<body>
+  <div class="branding">StreamX</div>
+  <div class="main">
+    <div class="video-panel">
+      <div class="meta-controls">
+        <input id="titleInput" type="text" placeholder="Stream Title" style="width: 180px;" />
+        <textarea id="descInput" placeholder="Description" rows="1" style="width: 180px;"></textarea>
+        <button id="updateMetaBtn">Update</button>
+      </div>
+      <div class="controls">
+        <button id="webcamBtn">Webcam</button>
+        <button id="screenBtn">Screen</button>
+        <button id="stopBtn" disabled>Stop</button>
+        <button id="audioBtn">Mute Audio</button>
+        <button id="videoBtn">Hide Video</button>
+        <select id="qualitySelect">
+          <option value="default">Default</option>
+          <option value="hd">HD</option>
+          <option value="sd">SD</option>
+        </select>
+        <button id="recordBtn">Start Recording</button>
+        <span id="recordingIndicator" class="recording-indicator" style="display:none;">● REC</span>
+      </div>
+      <div id="status">Idle</div>
+      <div class="video-aspect">
+        <video id="localVideo" autoplay muted playsinline></video>
+      </div>
+    </div>
+    <div class="side-panel">
+      <div class="viewer-count">Viewers: <span id="viewerCount">0</span></div>
+      <div class="emoji-panel">
+        <button class="emoji-btn">👍</button>
+        <button class="emoji-btn">😂</button>
+        <button class="emoji-btn">🔥</button>
+        <button class="emoji-btn">👏</button>
+        <button class="emoji-btn">😍</button>
+        <button class="emoji-btn">😮</button>
+      </div>
+      <div class="chat-box" id="chatBox"></div>
+      <form class="chat-input" id="chatForm">
+        <input id="chatInput" type="text" placeholder="Type a message..." autocomplete="off" />
+        <button type="submit">Send</button>
+      </form>
+      <button class="theme-toggle" id="themeToggle">Toggle Theme</button>
+    </div>
+  </div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    // Branding, theme, and meta
+    const socket = io();
+    socket.emit('role', 'host');
+    const localVideo = document.getElementById('localVideo');
+    const webcamBtn = document.getElementById('webcamBtn');
+    const screenBtn = document.getElementById('screenBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const audioBtn = document.getElementById('audioBtn');
+    const videoBtn = document.getElementById('videoBtn');
+    const qualitySelect = document.getElementById('qualitySelect');
+    const recordBtn = document.getElementById('recordBtn');
+    const recordingIndicator = document.getElementById('recordingIndicator');
+    const statusDiv = document.getElementById('status');
+    const titleInput = document.getElementById('titleInput');
+    const descInput = document.getElementById('descInput');
+    const updateMetaBtn = document.getElementById('updateMetaBtn');
+    const viewerCountSpan = document.getElementById('viewerCount');
+    const chatBox = document.getElementById('chatBox');
+    const chatForm = document.getElementById('chatForm');
+    const chatInput = document.getElementById('chatInput');
+    const emojiBtns = document.querySelectorAll('.emoji-btn');
+    const themeToggle = document.getElementById('themeToggle');
+    let pcs = {}; // One PeerConnection per viewer
+    let localStream = null;
+    let currentSource = null; // 'webcam' or 'screen'
+    let audioEnabled = true;
+    let videoEnabled = true;
+    let recorder = null;
+    let recordedChunks = [];
+    let isRecording = false;
+
+    // Theme toggle
+    themeToggle.onclick = () => {
+      if (document.body.style.background === 'white') {
+        document.body.style.background = '#181c20';
+        document.body.style.color = '#e0e6ed';
+      } else {
+        document.body.style.background = 'white';
+        document.body.style.color = '#181c20';
+      }
+    };
+
+    // Stream meta
+    updateMetaBtn.onclick = () => {
+      socket.emit('set-stream-meta', {
+        title: titleInput.value || 'Untitled Stream',
+        description: descInput.value || ''
+      });
+    };
+
+    // Chat
+    chatForm.onsubmit = e => {
+      e.preventDefault();
+      if (chatInput.value.trim()) {
+        socket.emit('chat', { user: 'Host', text: chatInput.value });
+        chatInput.value = '';
+      }
+    };
+    socket.on('chat', msg => {
+      const div = document.createElement('div');
+      div.textContent = `${msg.user}: ${msg.text}`;
+      chatBox.appendChild(div);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    });
+
+    // Emoji
+    emojiBtns.forEach(btn => {
+      btn.onclick = () => {
+        socket.emit('emoji', { emoji: btn.textContent });
+      };
+    });
+    socket.on('emoji', data => {
+      const div = document.createElement('div');
+      div.textContent = `Reaction: ${data.emoji}`;
+      chatBox.appendChild(div);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    });
+
+    // Viewer count
+    socket.on('viewer-count', count => {
+      viewerCountSpan.textContent = count;
+    });
+
+    // Stream meta updates
+    socket.on('stream-meta', meta => {
+      titleInput.value = meta.title;
+      descInput.value = meta.description;
+    });
+
+    function setStatus(msg) {
+      statusDiv.textContent = msg;
+    }
+
+    async function startStream(source) {
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+      }
+      let constraints = { video: true, audio: true };
+      if (qualitySelect.value === 'hd') constraints.video = { width: { ideal: 1280 }, height: { ideal: 720 } };
+      if (qualitySelect.value === 'sd') constraints.video = { width: { ideal: 640 }, height: { ideal: 360 } };
+      if (source === 'webcam') {
+        localStream = await navigator.mediaDevices.getUserMedia(constraints);
+        setStatus('Webcam streaming...');
+      } else if (source === 'screen') {
+        localStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+        setStatus('Screen casting...');
+      }
+      localVideo.srcObject = localStream;
+      currentSource = source;
+      updatePeerConnections();
+      webcamBtn.disabled = true;
+      screenBtn.disabled = true;
+      stopBtn.disabled = false;
+      socket.emit('signal', { control: 'resume' });
+    }
+
+    function stopStream() {
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+      }
+      setStatus('Paused / Will Resume Soon');
+      webcamBtn.disabled = false;
+      screenBtn.disabled = false;
+      stopBtn.disabled = true;
+      Object.values(pcs).forEach(pc => {
+        pc.getSenders().forEach(sender => {
+          if (sender.track) pc.removeTrack(sender);
+        });
+      });
+      localVideo.srcObject = null;
+      socket.emit('signal', { control: 'paused' });
+    }
+
+    function updatePeerConnections() {
+      Object.values(pcs).forEach(pc => {
+        pc.getSenders().forEach(sender => {
+          if (sender.track) pc.removeTrack(sender);
+        });
+        if (localStream) {
+          localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+        }
+      });
+    }
+
+    webcamBtn.onclick = () => startStream('webcam');
+    screenBtn.onclick = () => startStream('screen');
+    stopBtn.onclick = stopStream;
+
+    // Audio/Video toggle
+    audioBtn.onclick = () => {
+      audioEnabled = !audioEnabled;
+      if (localStream) {
+        localStream.getAudioTracks().forEach(track => track.enabled = audioEnabled);
+      }
+      audioBtn.textContent = audioEnabled ? 'Mute Audio' : 'Unmute Audio';
+    };
+    videoBtn.onclick = () => {
+      videoEnabled = !videoEnabled;
+      if (localStream) {
+        localStream.getVideoTracks().forEach(track => track.enabled = videoEnabled);
+      }
+      videoBtn.textContent = videoEnabled ? 'Hide Video' : 'Show Video';
+    };
+
+    // Quality selection
+    qualitySelect.onchange = () => {
+      if (currentSource) startStream(currentSource);
+    };
+
+    // Recording
+    recordBtn.onclick = () => {
+      if (!isRecording && localStream) {
+        recorder = new MediaRecorder(localStream);
+        recordedChunks = [];
+        recorder.ondataavailable = e => {
+          if (e.data.size > 0) recordedChunks.push(e.data);
+        };
+        recorder.onstop = () => {
+          const blob = new Blob(recordedChunks, { type: 'video/webm' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'stream_recording.webm';
+          a.click();
+        };
+        recorder.start();
+        isRecording = true;
+        recordingIndicator.style.display = '';
+        recordBtn.textContent = 'Stop Recording';
+      } else if (isRecording) {
+        recorder.stop();
+        isRecording = false;
+        recordingIndicator.style.display = 'none';
+        recordBtn.textContent = 'Start Recording';
+      }
+    };
+
+    socket.on('connect', () => {
+      setStatus('Connected to signaling server. Ready to cast.');
+    });
+
+    socket.on('ready-for-offer', async ({ viewerId }) => {
+      if (!pcs[viewerId]) {
+        pcs[viewerId] = new RTCPeerConnection();
+        if (localStream) {
+          localStream.getTracks().forEach(track => pcs[viewerId].addTrack(track, localStream));
+        }
+        pcs[viewerId].onicecandidate = event => {
+          if (event.candidate) {
+            socket.emit('signal', { candidate: event.candidate, to: viewerId });
+          }
+        };
+        pcs[viewerId].onconnectionstatechange = () => {
+          setStatus('Connection with viewer: ' + pcs[viewerId].connectionState);
+        };
+      }
+      const offer = await pcs[viewerId].createOffer();
+      await pcs[viewerId].setLocalDescription(offer);
+      socket.emit('signal', { desc: pcs[viewerId].localDescription, to: viewerId });
+    });
+
+    socket.on('signal', async data => {
+      const { from, desc, candidate } = data;
+      if (!pcs[from]) return;
+      if (desc) await pcs[from].setRemoteDescription(desc);
+      if (candidate) await pcs[from].addIceCandidate(candidate);
+    });
+
+    socket.on('disconnect', () => {
+      setStatus('Disconnected from signaling server');
+    });
+  </script>
+</body>
+</html> 

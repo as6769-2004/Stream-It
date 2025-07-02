@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Live Viewer</title>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      background: #181c20;
+      color: #e0e6ed;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      width: 100vw;
+      overflow: hidden;
+    }
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100vw;
+      height: 100vh;
+    }
+    #authPanel {
+      display: flex;
+      gap: 0.5em;
+      align-items: center;
+      margin-top: 1em;
+      margin-bottom: 0.5em;
+      background: #23272f;
+      border-radius: 8px;
+      padding: 0.7em 1.2em;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    #authPanel input {
+      background: #181c20;
+      color: #e0e6ed;
+      border: 1px solid #4fd1c5;
+      border-radius: 4px;
+      padding: 0.4em 0.7em;
+      font-size: 1em;
+    }
+    #authPanel button {
+      background: #4fd1c5;
+      color: #181c20;
+      border: none;
+      border-radius: 6px;
+      padding: 0.4em 1em;
+      font-size: 1em;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    #authStatus {
+      margin-left: 1em;
+      font-size: 0.98em;
+      color: #4fd1c5;
+    }
+    .branding {
+      margin-top: 1.5em;
+      font-size: 2em;
+      font-weight: bold;
+      color: #4fd1c5;
+      letter-spacing: 2px;
+      text-align: center;
+    }
+    .main {
+      display: flex;
+      flex-direction: row;
+      width: 100vw;
+      height: 100vh;
+      max-width: 1200px;
+      max-height: 700px;
+      justify-content: center;
+      align-items: center;
+      margin: 0 auto;
+      box-sizing: border-box;
+      background: #181c20;
+      border-radius: 18px;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.25);
+      overflow: hidden;
+    }
+    .side-panel {
+      flex: 0 0 340px;
+      min-width: 300px;
+      max-width: 350px;
+      background: #23272f;
+      border-radius: 0 12px 12px 0;
+      padding: 1em;
+      box-shadow: 2px 0 8px rgba(0,0,0,0.15);
+      display: flex;
+      flex-direction: column;
+      gap: 1em;
+      z-index: 2;
+      transition: transform 0.3s;
+      height: 100%;
+    }
+    .side-panel.hidden {
+      transform: translateX(-110%);
+    }
+    .video-panel {
+      flex: 1 1 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      position: relative;
+      background: #181c20;
+    }
+    .video-aspect {
+      position: relative;
+      width: 100%;
+      max-width: 850px;
+      aspect-ratio: 16 / 9;
+      background: #222;
+      border-radius: 0;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      margin: 0 auto;
+    }
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: #222;
+      border-radius: 0;
+      display: block;
+      max-width: 100%;
+      max-height: 100%;
+    }
+    .controls {
+      display: flex;
+      gap: 1em;
+      margin-bottom: 1em;
+      flex-wrap: wrap;
+      position: absolute;
+      top: 1.5em;
+      left: 1.5em;
+      z-index: 3;
+    }
+    .toggle-chat-btn {
+      background: #4fd1c5;
+      color: #181c20;
+      border: none;
+      border-radius: 6px;
+      padding: 0.5em 1em;
+      font-size: 1em;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-bottom: 1em;
+    }
+    button, select, input[type="text"] {
+      background: #4fd1c5;
+      color: #181c20;
+      border: none;
+      border-radius: 6px;
+      padding: 0.5em 1em;
+      font-size: 1em;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:disabled {
+      background: #2d3748;
+      color: #888;
+      cursor: not-allowed;
+    }
+    .chat-box {
+      background: #181c20;
+      border-radius: 8px;
+      padding: 0.5em;
+      height: 200px;
+      overflow-y: auto;
+      font-size: 1em;
+      margin-bottom: 0.5em;
+    }
+    .chat-input {
+      display: flex;
+      gap: 0.5em;
+    }
+    .emoji-panel {
+      display: flex;
+      gap: 0.5em;
+      flex-wrap: wrap;
+      margin-bottom: 0.5em;
+    }
+    .emoji-btn {
+      font-size: 1.5em;
+      background: none;
+      border: none;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+    .emoji-btn:hover {
+      transform: scale(1.2);
+    }
+    .viewer-count {
+      font-size: 1.1em;
+      color: #4fd1c5;
+      margin-bottom: 0.5em;
+    }
+    .theme-toggle {
+      margin-top: 1em;
+      align-self: flex-end;
+    }
+    .emoji-popup {
+      position: absolute;
+      font-size: 2.5em;
+      pointer-events: none;
+      animation: pop 1s ease-out forwards;
+    }
+    @keyframes pop {
+      0% { opacity: 1; transform: translateY(0) scale(1); }
+      80% { opacity: 1; transform: translateY(-60px) scale(1.3); }
+      100% { opacity: 0; transform: translateY(-80px) scale(1.1); }
+    }
+  </style>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+</head>
+<body>
+  <div id="authPanel">
+    <input id="email" type="email" placeholder="Email" />
+    <input id="password" type="password" placeholder="Password" />
+    <button id="signupBtn">Sign Up</button>
+    <button id="loginBtn">Log In</button>
+    <button id="logoutBtn" style="display:none;">Log Out</button>
+    <span id="authStatus"></span>
+  </div>
+  <div class="branding">StreamX</div>
+  <div class="main">
+    <div class="side-panel" id="sidePanel">
+      <button class="toggle-chat-btn" id="toggleChatBtn">Hide Chat</button>
+      <div class="viewer-count">Viewers: <span id="viewerCount">0</span></div>
+      <div class="emoji-panel">
+        <button class="emoji-btn">👍</button>
+        <button class="emoji-btn">😂</button>
+        <button class="emoji-btn">🔥</button>
+        <button class="emoji-btn">👏</button>
+        <button class="emoji-btn">😍</button>
+        <button class="emoji-btn">😮</button>
+      </div>
+      <div class="chat-box" id="chatBox"></div>
+      <form class="chat-input" id="chatForm">
+        <input id="chatInput" type="text" placeholder="Type a message..." autocomplete="off" />
+        <button type="submit">Send</button>
+      </form>
+      <button class="theme-toggle" id="themeToggle">Toggle Theme</button>
+    </div>
+    <div class="video-panel">
+      <div class="controls">
+        <button id="snapshotBtn">Snapshot</button>
+      </div>
+      <div id="metaTitle" style="font-size:1.3em;font-weight:600;margin-bottom:0.3em;"></div>
+      <div id="metaDesc" style="font-size:1em;color:#a0aec0;margin-bottom:0.7em;"></div>
+      <div class="video-aspect">
+        <video id="remoteVideo" autoplay muted playsinline></video>
+      </div>
+    </div>
+  </div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    // Firebase config placeholder
+    const firebaseConfig = {
+      apiKey: "AIzaSyA...yourkey...",
+      authDomain: "your-app.firebaseapp.com",
+      projectId: "your-app",
+      storageBucket: "your-app.appspot.com",
+      messagingSenderId: "1234567890",
+      appId: "1:1234567890:web:abcdefg12345"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+
+    const email = document.getElementById('email');
+    const password = document.getElementById('password');
+    const signupBtn = document.getElementById('signupBtn');
+    const loginBtn = document.getElementById('loginBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const authStatus = document.getElementById('authStatus');
+
+    signupBtn.onclick = () => {
+      auth.createUserWithEmailAndPassword(email.value, password.value)
+        .then(user => { authStatus.textContent = 'Signed up!'; })
+        .catch(err => { authStatus.textContent = err.message; });
+    };
+    loginBtn.onclick = () => {
+      auth.signInWithEmailAndPassword(email.value, password.value)
+        .then(user => { authStatus.textContent = 'Logged in!'; })
+        .catch(err => { authStatus.textContent = err.message; });
+    };
+    logoutBtn.onclick = () => {
+      auth.signOut();
+    };
+
+    let currentUser = null;
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        authStatus.textContent = `Logged in as ${user.email}`;
+        logoutBtn.style.display = '';
+        signupBtn.style.display = loginBtn.style.display = email.style.display = password.style.display = 'none';
+        currentUser = user;
+        document.getElementById('sidePanel').style.display = '';
+      } else {
+        authStatus.textContent = 'Not logged in';
+        logoutBtn.style.display = 'none';
+        signupBtn.style.display = loginBtn.style.display = email.style.display = password.style.display = '';
+        currentUser = null;
+        document.getElementById('sidePanel').style.display = 'none';
+      }
+    });
+  </script>
+  <script>
+    const socket = io();
+    socket.emit('role', 'viewer');
+    const remoteVideo = document.getElementById('remoteVideo');
+    const viewerCountSpan = document.getElementById('viewerCount');
+    const chatBox = document.getElementById('chatBox');
+    const chatForm = document.getElementById('chatForm');
+    const chatInput = document.getElementById('chatInput');
+    const emojiBtns = document.querySelectorAll('.emoji-btn');
+    const themeToggle = document.getElementById('themeToggle');
+    const metaTitle = document.getElementById('metaTitle');
+    const metaDesc = document.getElementById('metaDesc');
+    const snapshotBtn = document.getElementById('snapshotBtn');
+    const sidePanel = document.getElementById('sidePanel');
+    const toggleChatBtn = document.getElementById('toggleChatBtn');
+    let pc = new RTCPeerConnection();
+    let streamSet = false;
+    let bufferTimeout = null;
+
+    // Chat toggle
+    let chatVisible = true;
+    toggleChatBtn.onclick = () => {
+      chatVisible = !chatVisible;
+      if (chatVisible) {
+        sidePanel.classList.remove('hidden');
+        toggleChatBtn.textContent = 'Hide Chat';
+      } else {
+        sidePanel.classList.add('hidden');
+        toggleChatBtn.textContent = 'Show Chat';
+      }
+    };
+
+    // Theme toggle
+    themeToggle.onclick = () => {
+      if (document.body.style.background === 'white') {
+        document.body.style.background = '#181c20';
+        document.body.style.color = '#e0e6ed';
+      } else {
+        document.body.style.background = 'white';
+        document.body.style.color = '#181c20';
+      }
+    };
+
+    // Stream meta
+    socket.on('stream-meta', meta => {
+      metaTitle.textContent = meta.title;
+      metaDesc.textContent = meta.description;
+    });
+
+    // Chat
+    chatForm.onsubmit = e => {
+      e.preventDefault();
+      if (chatInput.value.trim() && currentUser) {
+        socket.emit('chat', { user: currentUser.email, text: chatInput.value });
+        chatInput.value = '';
+      }
+    };
+    socket.on('chat', msg => {
+      const div = document.createElement('div');
+      div.textContent = `${msg.user}: ${msg.text}`;
+      chatBox.appendChild(div);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    });
+
+    // Emoji
+    emojiBtns.forEach(btn => {
+      btn.onclick = () => {
+        if (currentUser) socket.emit('emoji', { emoji: btn.textContent, user: currentUser.email });
+      };
+    });
+    socket.on('emoji', data => {
+      // Emoji popup animation
+      const popup = document.createElement('div');
+      popup.className = 'emoji-popup';
+      popup.textContent = data.emoji;
+      const x = Math.random() * (remoteVideo.offsetWidth - 40) + 20;
+      popup.style.left = (remoteVideo.offsetLeft + x) + 'px';
+      popup.style.top = (remoteVideo.offsetTop + 40) + 'px';
+      document.body.appendChild(popup);
+      setTimeout(() => popup.remove(), 1000);
+      // Also add to chat
+      const div = document.createElement('div');
+      div.textContent = `Reaction: ${data.emoji}`;
+      chatBox.appendChild(div);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    });
+
+    // Viewer count
+    socket.on('viewer-count', count => {
+      viewerCountSpan.textContent = count;
+    });
+
+    // Snapshot/clip
+    snapshotBtn.onclick = () => {
+      if (!remoteVideo.srcObject) return;
+      const canvas = document.createElement('canvas');
+      canvas.width = remoteVideo.videoWidth;
+      canvas.height = remoteVideo.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(remoteVideo, 0, 0, canvas.width, canvas.height);
+      const url = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'snapshot.png';
+      a.click();
+    };
+
+    // WebRTC logic
+    pc.ontrack = event => {
+      if (!streamSet) {
+        remoteVideo.srcObject = event.streams[0];
+        streamSet = true;
+        remoteVideo.onloadedmetadata = () => {
+          setTimeout(() => {
+            remoteVideo.play();
+          }, 1500);
+        };
+      }
+    };
+
+    remoteVideo.onpause = () => {
+      if (!remoteVideo.ended && streamSet) {
+        setTimeout(() => {
+          remoteVideo.play();
+        }, 500);
+      }
+    };
+
+    socket.on('connect', () => {
+      socket.emit('ready-for-offer');
+    });
+
+    socket.on('signal', async data => {
+      if (data.desc) {
+        await pc.setRemoteDescription(data.desc);
+        if (data.desc.type === 'offer') {
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          socket.emit('signal', { desc: pc.localDescription });
+        }
+      }
+      if (data.candidate) {
+        await pc.addIceCandidate(data.candidate);
+      }
+    });
+
+    pc.onicecandidate = event => {
+      if (event.candidate) {
+        socket.emit('signal', { candidate: event.candidate });
+      }
+    };
+
+    pc.onconnectionstatechange = () => {};
+    socket.on('disconnect', () => {});
+  </script>
+</body>
+</html> 

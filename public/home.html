@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>SimpleTube</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #181c20;
+      color: #e0e6ed;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2em;
+    }
+
+    h1 {
+      font-size: 2.5em;
+      color: #4fd1c5;
+      margin-bottom: 1em;
+    }
+
+    .upload-form {
+      background: #23272f;
+      padding: 1.5em 2em;
+      border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+      display: flex;
+      align-items: center;
+      gap: 1em;
+      margin-bottom: 2em;
+      flex-wrap: wrap;
+    }
+
+    input[type="file"] {
+      color: #e0e6ed;
+      background-color: #2c313c;
+      border: none;
+      padding: 0.5em;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    button,
+    .nav-btn {
+      background: #4fd1c5;
+      color: #181c20;
+      border: none;
+      border-radius: 6px;
+      padding: 0.6em 1.2em;
+      font-size: 1em;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      text-decoration: none;
+      display: inline-block;
+      text-align: center;
+    }
+
+    button:hover,
+    .nav-btn:hover {
+      background: #38b2ac;
+    }
+
+    .video-list {
+      width: 100%;
+      max-width: 720px;
+    }
+
+    .video-list h2 {
+      margin-bottom: 1em;
+      color: #4fd1c5;
+    }
+
+    video {
+      width: 100%;
+      max-width: 640px;
+      margin-bottom: 2em;
+      border: 2px solid #4fd1c5;
+      border-radius: 12px;
+      background: #000;
+    }
+
+    .nav-buttons {
+      display: flex;
+      gap: 1em;
+      margin-bottom: 2em;
+    }
+
+    @media (max-width: 600px) {
+      video {
+        width: 100%;
+      }
+
+      .upload-form,
+      .nav-buttons {
+        flex-direction: column;
+        align-items: stretch;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <h1>SimpleTube</h1>
+
+  <!-- 🔘 Navigation -->
+  <div class="nav-buttons">
+    <a href="viewer.html" class="nav-btn">Join Stream</a>
+    <a href="host.html" class="nav-btn">Host Stream</a>
+  </div>
+
+  <!-- 📤 Upload Form -->
+  <form class="upload-form" action="/upload" method="post" enctype="multipart/form-data">
+    <input type="file" name="video" accept="video/*" required>
+    <button type="submit">Upload Video</button>
+  </form>
+
+  <!-- 📺 Video List -->
+  <div class="video-list" id="videoList">
+    <h2>Uploaded Videos</h2>
+    <div id="videos"></div>
+  </div>
+
+  <!-- ⚙️ Script -->
+  <script src="src/navbar.js"></script>
+
+  <script>
+    async function loadVideos() {
+      const res = await fetch('/videos');
+      const files = await res.json();
+      const videosDiv = document.getElementById('videos');
+      videosDiv.innerHTML = '';
+      files.forEach(file => {
+        const video = document.createElement('video');
+        video.src = file;
+        video.controls = true;
+        videosDiv.appendChild(video);
+      });
+    }
+    loadVideos();
+  </script>
+</body>
+
+</html>
