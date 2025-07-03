@@ -1,7 +1,4 @@
-// src/firebase-init.js
-import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-
+// public/firebase-init.js
 const firebaseConfig = {
   apiKey: "AIzaSyCraQviZFsN5DNtATLHS7R4JdqvBH0le_I",
   authDomain: "stream-platform-2025.firebaseapp.com",
@@ -13,7 +10,4 @@ const firebaseConfig = {
   measurementId: "G-CYHF9Q68QG"
 };
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-
-export { app, auth };
+firebase.initializeApp(firebaseConfig);
