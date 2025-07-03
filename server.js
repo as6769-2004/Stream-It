@@ -14,44 +14,47 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 // -----------------------------
-// ✅ Static Files (Your Project)
+// ✅ Middleware
 // -----------------------------
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // -----------------------------
-// ✅ File Upload Support
+// ✅ Video Upload Handling
 // -----------------------------
 const upload = multer({ dest: 'uploads/' });
+
 app.post('/upload', upload.single('video'), (req, res) => {
-  const file = req.file;
-  if (!file) return res.status(400).send('No file uploaded');
+  if (!req.file) return res.status(400).send('No file uploaded');
 
-  const ext = path.extname(file.originalname);
-  const newPath = path.join('uploads', file.filename + ext);
+  const ext = path.extname(req.file.originalname);
+  const newPath = path.join('uploads', req.file.filename + ext);
 
-  fs.renameSync(file.path, newPath);
-  res.redirect('/simpletube.html');
+  fs.rename(req.file.path, newPath, (err) => {
+    if (err) {
+      console.error('Rename failed:', err);
+      return res.status(500).send('File processing error');
+    }
+    res.redirect('/simpletube.html');
+  });
 });
 
-// -----------------------------
-// ✅ List uploaded videos
-// -----------------------------
 app.get('/videos', (req, res) => {
-  const folder = path.join(__dirname, 'uploads');
-  fs.readdir(folder, (err, files) => {
-    if (err) return res.status(500).json({ error: 'Unable to list videos' });
+  const uploadDir = path.join(__dirname, 'uploads');
+
+  fs.readdir(uploadDir, (err, files) => {
+    if (err) {
+      console.error('Failed to read uploads:', err);
+      return res.status(500).json({ error: 'Unable to list videos' });
+    }
+
     const urls = files.map(file => `/uploads/${file}`);
     res.json(urls);
   });
 });
 
 // -----------------------------
-// ✅ Serve uploaded files
-// -----------------------------
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// -----------------------------
-// ✅ WebSocket / Signaling
+// ✅ WebSocket Signaling
 // -----------------------------
 let hostSocket = null;
 let viewerSockets = [];
@@ -63,8 +66,9 @@ function updateViewerCount() {
 
 io.on('connection', (socket) => {
   socket.on('role', (role) => {
-    if (role === 'host') hostSocket = socket;
-    if (role === 'viewer') {
+    if (role === 'host') {
+      hostSocket = socket;
+    } else if (role === 'viewer') {
       viewerSockets.push(socket);
       updateViewerCount();
       socket.emit('stream-meta', streamMeta);
@@ -77,7 +81,9 @@ io.on('connection', (socket) => {
   });
 
   socket.on('ready-for-offer', () => {
-    if (hostSocket) hostSocket.emit('ready-for-offer', { viewerId: socket.id });
+    if (hostSocket) {
+      hostSocket.emit('ready-for-offer', { viewerId: socket.id });
+    }
   });
 
   socket.on('signal', (data) => {
@@ -90,25 +96,29 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('chat', (msg) => {
-    io.emit('chat', msg);
-  });
-
-  socket.on('emoji', (emoji) => {
-    io.emit('emoji', emoji);
-  });
+  socket.on('chat', (msg) => io.emit('chat', msg));
+  socket.on('emoji', (emoji) => io.emit('emoji', emoji));
 
   socket.on('disconnect', () => {
-    if (socket === hostSocket) hostSocket = null;
-    viewerSockets = viewerSockets.filter(s => s !== socket);
+    if (socket === hostSocket) {
+      hostSocket = null;
+    }
+    viewerSockets = viewerSockets.filter(v => v !== socket);
     updateViewerCount();
   });
 });
 
 // -----------------------------
+// ✅ Fallback Route (optional)
+// -----------------------------
+// app.get('*', (req, res) => {
+//   res.status(404).sendFile(path.join(__dirname, 'public/404.html'));
+// });
+
+// -----------------------------
 // ✅ Start Server
 // -----------------------------
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`✅ Server running at http://localhost:${PORT}`);
 });
