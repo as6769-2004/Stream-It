@@ -5,8 +5,12 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0a0a23;
+  --foreground: #e0e6ed;
+  --accent: #14ffe9;
+  --accent2: #ffeb3b;
+  --card-bg: rgba(20, 22, 34, 0.85);
+  --glass-blur: 18px;
 }
 
 @theme inline {
@@ -24,7 +28,52 @@
 }
 
 body {
-  background: var(--background);
+  background: linear-gradient(135deg, #181c2b 0%, #232946 100%);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Inter', 'Segoe UI', Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+}
+
+/* Fancy glowing button */
+.btn-glow {
+  @apply px-8 py-3 rounded-xl font-bold text-lg shadow-lg transition-all duration-200;
+  background: linear-gradient(90deg, #14ffe9 0%, #ffeb3b 100%);
+  color: #181c2b;
+  box-shadow: 0 0 16px 2px #14ffe9, 0 0 32px 4px #ffeb3b33;
+  border: none;
+}
+.btn-glow:hover {
+  filter: brightness(1.1) drop-shadow(0 0 8px #14ffe9);
+  transform: translateY(-2px) scale(1.03);
+}
+
+/* Glassmorphism card */
+.card-glass {
+  @apply rounded-2xl p-8 shadow-xl border border-[#232946]/60;
+  background: var(--card-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  box-shadow: 0 8px 32px 0 #23294644;
+}
+
+/* Feature icon button */
+.btn-feature {
+  @apply flex items-center gap-2 px-6 py-3 rounded-lg font-semibold text-base transition-all duration-150 shadow-md;
+  background: linear-gradient(90deg, #232946 0%, #14ffe9 100%);
+  color: #fff;
+  border: 1.5px solid #14ffe9;
+}
+.btn-feature:hover {
+  background: linear-gradient(90deg, #14ffe9 0%, #232946 100%);
+  color: #232946;
+  border-color: #ffeb3b;
+  box-shadow: 0 0 12px #14ffe999;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  background: #232946;
+}
+::-webkit-scrollbar-thumb {
+  background: #14ffe9;
+  border-radius: 8px;
 }

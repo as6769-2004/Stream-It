@@ -95,7 +95,13 @@ export default function Host() {
 
   useEffect(() => {
     if (!isStreaming || !sessionKey) return;
-    const socket = io('http://localhost:8000');
+    let socket;
+    try {
+      socket = io('http://localhost:8000');
+    } catch (err) {
+      setStatus('Could not connect to the server. Make sure the backend is running.');
+      return;
+    }
     socketRef.current = socket;
     socket.emit('role', 'host');
     socket.emit('set-stream-meta', { title, description, sessionKey });
@@ -135,6 +141,7 @@ export default function Host() {
       if (desc) await pcsRef.current[from].setRemoteDescription(desc);
       if (candidate) await pcsRef.current[from].addIceCandidate(candidate);
     });
+    socket.on('connect_error', () => setStatus('Could not connect to the server. Make sure the backend is running.'));
     return () => {
       socket.disconnect();
       Object.values(pcsRef.current).forEach((pc) => pc.close());
@@ -142,12 +149,13 @@ export default function Host() {
     };
   }, [isStreaming, sessionKey, title, description, stream]);
 
+  // Helper to update all peer connections with the latest stream tracks
   const updatePeerConnections = () => {
     Object.values(pcsRef.current).forEach((pc) => {
       const senders = pc.getSenders();
-
+      // Replace or add tracks for each kind
       stream?.getTracks().forEach((newTrack) => {
-        const matchingSender = senders.find((s) => s.track?.kind === newTrack.kind);
+        const matchingSender = senders.find((s) => s.track && s.track.kind === newTrack.kind);
         if (matchingSender) {
           matchingSender.replaceTrack(newTrack);
         } else {
@@ -155,7 +163,6 @@ export default function Host() {
         }
       });
     });
-
   };
 
   const startStream = async (source: 'webcam' | 'screen') => {
@@ -169,7 +176,6 @@ export default function Host() {
         videoRef.current.srcObject = null;
       }
       stream?.getTracks().forEach((track) => track.stop());
-
     }
     let constraints: any = { video: true, audio: true };
     if (!mobile && source === 'webcam') {
@@ -196,14 +202,14 @@ export default function Host() {
       setIsStreaming(true);
       setAudioEnabled(true);
       setVideoEnabled(true);
-      updatePeerConnections();
+      // Update all peer connections with the new stream
+      setTimeout(updatePeerConnections, 100);
       // Notify viewers to restart stream
       if (socketRef.current) {
         socketRef.current.emit('restart-stream');
       }
-    } catch (err: any) {
-      alert('Could not access camera/mic: ' + (err.message || err));
-      setStatus('Camera/mic access denied or unavailable.');
+    } catch (err) {
+      setStatus('Could not access camera/mic');
     }
   };
 
@@ -255,19 +261,19 @@ export default function Host() {
 
   const handleAudioToggle = () => {
     setAudioEnabled((prev) => {
-      if (stream) {
-        stream.getAudioTracks().forEach((track) => (track.enabled = !prev));
-      }
-      return !prev;
+      const newVal = !prev;
+      stream?.getAudioTracks().forEach((track) => (track.enabled = newVal));
+      updatePeerConnections();
+      return newVal;
     });
   };
 
   const handleVideoToggle = () => {
     setVideoEnabled((prev) => {
-      if (stream) {
-        stream.getVideoTracks().forEach((track) => (track.enabled = !prev));
-      }
-      return !prev;
+      const newVal = !prev;
+      stream?.getVideoTracks().forEach((track) => (track.enabled = newVal));
+      updatePeerConnections();
+      return newVal;
     });
   };
 
@@ -315,6 +321,13 @@ export default function Host() {
     }
   };
 
+  useEffect(() => {
+    // When stream changes, update peer connections
+    if (stream) {
+      updatePeerConnections();
+    }
+  }, [stream]);
+
   if (user === null) {
     return (
       <>
@@ -329,60 +342,83 @@ export default function Host() {
   return (
     <>
       <Navbar />
-      <div style={{ minHeight: '100vh', background: theme === 'dark' ? '#181c20' : 'white', color: theme === 'dark' ? 'white' : '#181c20', fontFamily: 'Segoe UI, Arial, sans-serif', padding: 0, margin: 0 }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '2rem 1rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <div style={{ fontSize: '2.2rem', fontWeight: 700, color: '#4fd1c5', letterSpacing: 2, marginBottom: 24, textAlign: 'center' }}>Stream-It - Host Panel</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 32, width: '100%', justifyContent: 'center', alignItems: 'flex-start' }}>
+      <div className="flex flex-col items-center justify-center min-h-screen px-4 py-8">
+        <div className="card-glass w-full max-w-5xl flex flex-col items-center">
+          <div className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 via-blue-400 to-yellow-300 mb-6 drop-shadow-lg text-center">Stream-It - Host Panel</div>
+          {/* Step-by-step Instructions */}
+          <div className="bg-teal-900 text-teal-200 rounded-lg p-4 mb-6 max-w-xl mx-auto text-sm">
+            <div className="font-bold mb-1">How to Host a Class:</div>
+            <ol className="list-decimal list-inside space-y-1">
+              <li>Click <b>Start Webcam</b> or <b>Start Screen Cast</b> to begin your class.</li>
+              <li>Copy the session key below and share it with your students.</li>
+              <li>Keep this page open while hosting. If you stop streaming, students will be disconnected.</li>
+              <li>If you see errors, make sure your camera/mic are allowed and the backend server is running.</li>
+            </ol>
+          </div>
+          {/* Main Controls */}
+          <div className="flex flex-col md:flex-row gap-8 w-full justify-center items-start">
             {/* Video & Controls */}
-            <div style={{ flex: 2, minWidth: 340, maxWidth: 600, display: 'flex', flexDirection: 'column', alignItems: 'center', background: theme === 'dark' ? '#23272f' : '#f4f4f4', borderRadius: 16, boxShadow: '0 4px 24px rgba(0,0,0,0.15)', padding: 24 }}>
-              {/* Meta Controls */}
-              <div style={{ display: 'flex', gap: 12, marginBottom: 18, width: '100%', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center' }}>
-                <input type="text" placeholder="Stream Title" value={title} onChange={e => setTitle(e.target.value)} style={{ flex: 1, minWidth: 120, maxWidth: 180, padding: '0.5em 1em', borderRadius: 8, border: '1px solid #4fd1c5', fontSize: 16, background: theme === 'dark' ? '#181c20' : '#fff', color: 'inherit' }} />
-                <textarea placeholder="Description" rows={1} value={description} onChange={e => setDescription(e.target.value)} style={{ flex: 1, minWidth: 120, maxWidth: 180, padding: '0.5em 1em', borderRadius: 8, border: '1px solid #4fd1c5', fontSize: 16, background: theme === 'dark' ? '#181c20' : '#fff', color: 'inherit', resize: 'none' }} />
-                <button onClick={handleUpdateMeta} style={{ background: '#4fd1c5', color: '#181c20', fontWeight: 600, border: 'none', borderRadius: 8, padding: '0.5em 1.2em', fontSize: 16, cursor: 'pointer', transition: 'background 0.2s' }}>Update</button>
+            <div className="flex flex-col items-center gap-4 w-full md:w-2/3">
+              <div className="w-full aspect-video bg-black rounded-xl overflow-hidden shadow-lg mb-2 flex items-center justify-center">
+                <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-contain bg-black rounded-xl" />
               </div>
-              {/* Controls */}
-              <div style={{ display: 'flex', gap: 12, marginBottom: 18, flexWrap: 'wrap', justifyContent: 'center', width: '100%' }}>
-                <button onClick={() => startStream('webcam')} style={{ background: '#4fd1c5', color: '#181c20', fontWeight: 600, border: 'none', borderRadius: 8, padding: '0.5em 1.2em', fontSize: 16, cursor: 'pointer', transition: 'background 0.2s' }}>Webcam</button>
-                <button onClick={() => startStream('screen')} style={{ background: '#4fd1c5', color: '#181c20', fontWeight: 600, border: 'none', borderRadius: 8, padding: '0.5em 1.2em', fontSize: 16, cursor: 'pointer', transition: 'background 0.2s' }}>Screen</button>
-                <button onClick={stopStream} disabled={!isStreaming} style={{ background: isStreaming ? '#ff4d4f' : '#888', color: '#fff', fontWeight: 600, border: 'none', borderRadius: 8, padding: '0.5em 1.2em', fontSize: 16, cursor: isStreaming ? 'pointer' : 'not-allowed', transition: 'background 0.2s' }}>Stop</button>
-                <button onClick={handleAudioToggle} style={{ background: '#23272f', color: '#4fd1c5', fontWeight: 600, border: '1px solid #4fd1c5', borderRadius: 8, padding: '0.5em 1.2em', fontSize: 16, cursor: 'pointer', transition: 'background 0.2s' }}>{audioEnabled ? 'Mute Audio' : 'Unmute Audio'}</button>
-                <button onClick={handleVideoToggle} style={{ background: '#23272f', color: '#4fd1c5', fontWeight: 600, border: '1px solid #4fd1c5', borderRadius: 8, padding: '0.5em 1.2em', fontSize: 16, cursor: 'pointer', transition: 'background 0.2s' }}>{videoEnabled ? 'Hide Video' : 'Show Video'}</button>
-                <select value={quality} onChange={handleQualityChange} style={{ background: '#23272f', color: '#4fd1c5', fontWeight: 600, border: '1px solid #4fd1c5', borderRadius: 8, padding: '0.5em 1.2em', fontSize: 16, cursor: 'pointer' }}>
-                  {QUALITIES.map(q => <option key={q.value} value={q.value}>{q.label}</option>)}
-                </select>
-                <button onClick={handleRecord} style={{ background: isRecording ? '#ff4d4f' : '#4fd1c5', color: isRecording ? '#fff' : '#181c20', fontWeight: 600, border: 'none', borderRadius: 8, padding: '0.5em 1.2em', fontSize: 16, cursor: 'pointer', transition: 'background 0.2s' }}>{isRecording ? 'Stop Recording' : 'Start Recording'}</button>
-                {recordingIndicator && <span style={{ color: '#ff4d4f', fontWeight: 'bold', marginLeft: 8 }}>● REC</span>}
+              <div className="flex flex-wrap gap-4 justify-center">
+                {!isStreaming ? (
+                  <>
+                    <button className="btn-glow" onClick={() => startStream('webcam')}>Start Webcam</button>
+                    <button className="btn-glow" onClick={() => startStream('screen')}>Start Screen Cast</button>
+                  </>
+                ) : (
+                  <button className="btn-glow" onClick={stopStream}>Stop Stream</button>
+                )}
+                <button className="btn-feature" onClick={handleAudioToggle}>{audioEnabled ? 'Mute Audio' : 'Unmute Audio'}</button>
+                <button className="btn-feature" onClick={handleVideoToggle}>{videoEnabled ? 'Hide Video' : 'Show Video'}</button>
+                <button className="btn-feature" onClick={handleRecord}>{isRecording ? 'Stop Recording' : 'Record'}</button>
               </div>
-              <div style={{ fontSize: 15, color: '#4fd1c5', marginBottom: 8 }}>{status}</div>
-              <div style={{ width: '100%', aspectRatio: '16 / 9', background: '#222', borderRadius: 12, boxShadow: '0 4px 24px rgba(0,0,0,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginBottom: 12 }}>
-                <video ref={videoRef} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#222', borderRadius: 12, display: 'block' }} />
-              </div>
+            </div>
+            {/* Chat/Meta/Session Key */}
+            <div className="flex flex-col gap-6 w-full md:w-1/3">
+              {/* Session Key Display & Instructions */}
               {isStreaming && sessionKey && (
-                <div style={{ color: '#4fd1c5', marginTop: 8, fontSize: 17, textAlign: 'center' }}>
-                  <strong>Session Key:</strong> <span style={{ fontSize: 20, letterSpacing: 2 }}>{sessionKey}</span>
-                  <div style={{ fontSize: 14, color: '#ccc' }}>Share this key with viewers to let them join your stream.</div>
+                <div className="mb-6 flex flex-col items-center">
+                  <div className="text-lg font-semibold text-teal-400 mb-2">Session Key:</div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-3xl font-mono bg-gray-900 px-4 py-2 rounded-lg border border-teal-500 select-all">{sessionKey}</span>
+                    <button
+                      className="ml-2 px-3 py-1 bg-teal-600 hover:bg-teal-500 text-white rounded transition text-sm"
+                      onClick={() => {navigator.clipboard.writeText(sessionKey)}}
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <div className="mt-2 text-gray-300 text-center max-w-md">
+                    Share this session key with your students. They must enter it on the Join page to watch your class live.
+                  </div>
                 </div>
               )}
-            </div>
-            {/* Side Panel */}
-            <div style={{ flex: 1, minWidth: 280, maxWidth: 340, background: theme === 'dark' ? '#23272f' : '#f4f4f4', borderRadius: 16, boxShadow: '0 4px 24px rgba(0,0,0,0.10)', padding: 20, display: 'flex', flexDirection: 'column', gap: 18, height: '100%' }}>
-              <div style={{ fontSize: 18, color: '#4fd1c5', marginBottom: 6 }}>Viewers: <span>{viewerCount}</span></div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-                {EMOJIS.map((emoji) => (
-                  <button key={emoji} style={{ fontSize: 22, background: 'none', border: 'none', cursor: 'pointer', transition: 'transform 0.1s', borderRadius: 6, padding: 4, color: '#4fd1c5' }} onClick={() => handleSendEmoji(emoji)}>{emoji}</button>
-                ))}
+              {/* Status */}
+              <div className="text-sm text-gray-400 mb-2">Status: <span className="font-semibold text-teal-300">{status}</span></div>
+              {/* Viewer Count */}
+              <div className="text-sm text-gray-400 mb-2">Viewers: <span className="font-semibold text-yellow-300">{viewerCount}</span></div>
+              {/* Chat */}
+              <div className="bg-[#181c2b] rounded-lg p-4 shadow-inner max-h-60 overflow-y-auto text-sm">
+                <div className="font-semibold text-teal-300 mb-2">Chat</div>
+                <div className="space-y-1 mb-2">
+                  {chatMessages.map((msg, i) => (
+                    <div key={i} className="text-gray-200"><span className="font-bold text-teal-400">{msg.user}:</span> {msg.text}</div>
+                  ))}
+                </div>
+                <form onSubmit={handleSendMessage} className="flex gap-2 mt-2">
+                  <input
+                    type="text"
+                    value={message}
+                    onChange={e => setMessage(e.target.value)}
+                    placeholder="Type a message..."
+                    className="flex-1 px-3 py-2 rounded-lg bg-gray-800 text-white border border-teal-700 focus:outline-none"
+                  />
+                  <button type="submit" className="btn-feature">Send</button>
+                </form>
               </div>
-              <div style={{ background: theme === 'dark' ? '#181c20' : '#fff', borderRadius: 8, padding: '0.5em', height: 180, overflowY: 'auto', fontSize: 15, marginBottom: 8, border: '1px solid #4fd1c5' }}>
-                {chatMessages.map((msg, i) => (
-                  <div key={i}><strong>{msg.user}:</strong> {msg.text}</div>
-                ))}
-              </div>
-              <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: 8 }}>
-                <input type="text" value={message} onChange={e => setMessage(e.target.value)} placeholder="Type a message..." style={{ flex: 1, padding: '0.5em', borderRadius: 6, border: '1px solid #4fd1c5', fontSize: 15, background: theme === 'dark' ? '#181c20' : '#fff', color: 'inherit' }} />
-                <button type="submit" style={{ background: '#4fd1c5', color: '#181c20', fontWeight: 600, border: 'none', borderRadius: 6, padding: '0.5em 1.2em', fontSize: 15, cursor: 'pointer', transition: 'background 0.2s' }}>Send</button>
-              </form>
-              <button onClick={handleThemeToggle} style={{ background: 'none', color: '#4fd1c5', border: '1px solid #4fd1c5', borderRadius: 8, padding: '0.5em 1.2em', fontSize: 15, fontWeight: 600, cursor: 'pointer', marginTop: 8 }}>Toggle Theme</button>
             </div>
           </div>
         </div>

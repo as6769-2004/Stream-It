@@ -85,10 +85,17 @@ export default function Viewer() {
 
   useEffect(() => {
     if (!sessionKey) return;
-    const socket = io('http://192.168.142.63:8000');
+    let socket;
+    try {
+      socket = io('http://localhost:8000');
+    } catch (err) {
+      setError('Could not connect to the server. Make sure the backend is running.');
+      return;
+    }
     socketRef.current = socket;
     socket.emit('role', 'viewer');
     socket.on('connect', () => setStatus('Connected'));
+    socket.on('connect_error', () => setError('Could not connect to the server. Make sure the backend is running.'));
     socket.on('stream-meta', (meta) => setStreamMeta(meta));
     socket.on('viewer-count', (count: number) => setViewerCount(count));
     socket.on('chat', (msg) => {
@@ -249,117 +256,87 @@ export default function Viewer() {
     );
   }
 
-  if (!sessionKey) {
-    return (
-      <>
-        <Navbar />
-        <div style={{ minHeight: '100vh', background: '#0f1117', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <h2 style={{ color: '#4fd1c5', marginBottom: '1rem' }}>Enter Session Key to Join Stream</h2>
-          <input
-            type="text"
-            value={inputSessionKey}
-            onChange={e => setInputSessionKey(e.target.value)}
-            style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: 'none', outline: 'none', fontSize: '1.2rem', marginBottom: '1rem', textAlign: 'center', letterSpacing: '2px' }}
-            placeholder="Session Key"
-            maxLength={8}
-          />
-          <button
-            onClick={handleJoin}
-            style={{ background: '#4fd1c5', color: '#0f1117', fontWeight: 'bold', padding: '0.75rem 1.5rem', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '1rem' }}
-          >
-            Join
-          </button>
-          {error && <div style={{ color: 'red', marginTop: '1rem' }}>{error}</div>}
-        </div>
-      </>
-    );
-  }
-
   return (
     <>
       <Navbar />
-      <div className="branding mt-6 text-2xl font-bold text-teal-400 text-center">StreamX</div>
-      <div className="main flex flex-col md:flex-row w-full max-w-5xl mx-auto bg-[#181c20] rounded-2xl shadow-lg overflow-hidden mt-4">
-        {/* Video Section */}
-        <div className="flex-1 flex flex-col items-center p-4 relative">
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted={isMuted}
-            className="rounded-lg w-full max-w-lg aspect-video bg-black"
-            style={{ maxHeight: 320 }}
-          />
-          {/* Black overlay if stream is lost or black frame */}
-          {!isStreamActive && (
-            <div className="absolute top-0 left-0 w-full h-full bg-black opacity-100 z-20 flex items-center justify-center">
-              <span className="text-gray-400">No video stream</span>
-            </div>
-          )}
-          {/* Buffering Spinner */}
-          {isBuffering && (
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
-              <div className="w-12 h-12 border-4 border-teal-400 border-t-transparent rounded-full animate-spin"></div>
-            </div>
-          )}
-          <div className="flex flex-row gap-2 mt-2 justify-center">
-            <button onClick={handleMuteToggle} className="bg-teal-500 hover:bg-teal-400 text-black px-3 py-1 rounded-md font-semibold text-sm">
-              {isMuted ? 'Unmute' : 'Mute'}
-            </button>
-            <button onClick={handleFullscreen} className="bg-blue-500 hover:bg-blue-400 text-white px-3 py-1 rounded-md font-semibold text-sm">
-              Fullscreen
-            </button>
+      <div className="flex flex-col items-center justify-center min-h-screen px-4 py-8">
+        <div className="card-glass w-full max-w-5xl flex flex-col items-center">
+          <div className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 via-blue-400 to-yellow-300 mb-6 drop-shadow-lg text-center">Stream-It - Viewer</div>
+          {/* Step-by-step Instructions */}
+          <div className="bg-blue-900 text-blue-200 rounded-lg p-4 mb-6 max-w-xl mx-auto text-sm">
+            <div className="font-bold mb-1">How to Join a Class:</div>
+            <ol className="list-decimal list-inside space-y-1">
+              <li>Ask your host for the session key.</li>
+              <li>Enter the session key below and click <b>Join Class</b>.</li>
+              <li>Allow access to your speakers/headphones if prompted.</li>
+              <li>If you see errors, make sure the host is streaming and you entered the correct key.</li>
+            </ol>
           </div>
-        </div>
-        {/* Side Panel */}
-        <div className="flex-1 flex flex-col p-4 gap-4 min-w-[260px] max-w-md">
-          <div className="text-lg text-teal-400 font-semibold mb-2">Join Stream</div>
+          {/* Session Key Input & Instructions */}
           {!sessionKey && (
-            <div className="flex flex-col gap-2 items-center">
+            <div className="flex flex-col items-center justify-center min-h-[30vh]">
+              <div className="text-lg font-semibold text-blue-400 mb-2">Enter Session Key</div>
               <input
                 type="text"
                 value={inputSessionKey}
-                onChange={e => setInputSessionKey(e.target.value)}
-                className="px-3 py-2 rounded-lg border border-teal-400 text-black text-center text-lg w-full"
-                placeholder="Session Key"
+                onChange={e => setInputSessionKey(e.target.value.toUpperCase())}
+                placeholder="e.g. 1A2B3C"
+                className="text-2xl font-mono px-6 py-3 rounded-lg border-2 border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400 mb-3 bg-gray-900 text-white text-center w-64"
                 maxLength={8}
+                autoFocus
               />
               <button
                 onClick={handleJoin}
-                className="bg-teal-500 hover:bg-teal-400 text-black px-4 py-2 rounded-md font-semibold w-full"
+                className="btn-glow mb-2"
               >
-                Join
+                Join Class
               </button>
-              {error && <div className="text-red-400 text-sm mt-1">{error}</div>}
+              {error && <div className="text-red-400 mt-1">{error}</div>}
+              <div className="mt-2 text-gray-300 text-center max-w-md">
+                Ask your host for the session key to join the live class.
+              </div>
             </div>
           )}
+          {/* Main Content */}
           {sessionKey && (
-            <>
-              <div className="text-teal-300 font-semibold mb-1">Session: {streamMeta.title}</div>
-              <div className="text-gray-400 mb-2">{streamMeta.description}</div>
-              <div className="text-gray-400 mb-2">Viewers: {viewerCount}</div>
-              <div className="flex flex-row gap-2 mb-2">
-                {EMOJIS.map((emoji) => (
-                  <button key={emoji} className="text-2xl" onClick={() => handleSendEmoji(emoji)}>{emoji}</button>
-                ))}
+            <div className="flex flex-col md:flex-row gap-8 w-full justify-center items-start mt-6">
+              {/* Video Section */}
+              <div className="flex flex-col items-center gap-4 w-full md:w-2/3">
+                <div className="w-full aspect-video bg-black rounded-xl overflow-hidden shadow-lg mb-2 flex items-center justify-center">
+                  <video ref={videoRef} autoPlay playsInline muted={isMuted} className="w-full h-full object-contain bg-black rounded-xl" />
+                </div>
+                <div className="flex flex-wrap gap-4 justify-center">
+                  <button className="btn-feature" onClick={handleMuteToggle}>{isMuted ? 'Unmute' : 'Mute'}</button>
+                  <button className="btn-feature" onClick={handleFullscreen}>Fullscreen</button>
+                </div>
               </div>
-              <div className="bg-[#23272f] rounded-lg p-2 h-32 overflow-y-auto text-sm mb-2">
-                {chatMessages.map((msg, i) => (
-                  <div key={i}><strong>{msg.user}:</strong> {msg.text}</div>
-                ))}
+              {/* Chat/Meta */}
+              <div className="flex flex-col gap-6 w-full md:w-1/3">
+                {/* Status */}
+                <div className="text-sm text-gray-400 mb-2">Status: <span className="font-semibold text-teal-300">{status}</span></div>
+                {/* Viewer Count */}
+                <div className="text-sm text-gray-400 mb-2">Viewers: <span className="font-semibold text-yellow-300">{viewerCount}</span></div>
+                {/* Chat */}
+                <div className="bg-[#181c2b] rounded-lg p-4 shadow-inner max-h-60 overflow-y-auto text-sm">
+                  <div className="font-semibold text-teal-300 mb-2">Chat</div>
+                  <div className="space-y-1 mb-2">
+                    {chatMessages.map((msg, i) => (
+                      <div key={i} className="text-gray-200"><span className="font-bold text-teal-400">{msg.user}:</span> {msg.text}</div>
+                    ))}
+                  </div>
+                  <form onSubmit={sendMessage} className="flex gap-2 mt-2">
+                    <input
+                      type="text"
+                      value={message}
+                      onChange={e => setMessage(e.target.value)}
+                      placeholder="Type a message..."
+                      className="flex-1 px-3 py-2 rounded-lg bg-gray-800 text-white border border-blue-700 focus:outline-none"
+                    />
+                    <button type="submit" className="btn-feature">Send</button>
+                  </form>
+                </div>
               </div>
-              <form onSubmit={sendMessage} className="flex flex-row gap-2">
-                <input
-                  type="text"
-                  value={message}
-                  onChange={e => setMessage(e.target.value)}
-                  className="flex-1 px-2 py-1 rounded-lg border border-teal-400 text-black"
-                  placeholder="Type a message..."
-                />
-                <button type="submit" className="bg-teal-500 hover:bg-teal-400 text-black px-3 py-1 rounded-md font-semibold">Send</button>
-              </form>
-              <button onClick={handleThemeToggle} className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded-md font-semibold mt-2">Toggle Theme</button>
-            </>
+            </div>
           )}
         </div>
       </div>

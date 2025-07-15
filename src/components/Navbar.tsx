@@ -32,9 +32,9 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="bg-[#0f1117] border-b border-teal-700 text-white px-6 py-4 flex items-center justify-between relative">
+    <nav className="card-glass border-b border-teal-700 text-white px-6 py-4 flex items-center justify-between relative shadow-lg backdrop-blur-md">
       {/* Left: Logo */}
-      <Link href="/" className="text-2xl font-bold text-teal-400">
+      <Link href="/" className="text-2xl font-extrabold bg-gradient-to-r from-teal-400 via-blue-400 to-yellow-300 bg-clip-text text-transparent drop-shadow-lg">
         Stream-It
       </Link>
 
@@ -50,7 +50,7 @@ export default function Navbar() {
         {!user ? (
           <button
             onClick={handleSignIn}
-            className="bg-teal-500 hover:bg-teal-400 text-black px-4 py-2 rounded-lg text-sm font-semibold transition"
+            className="btn-feature"
           >
             Signin
           </button>
@@ -61,7 +61,7 @@ export default function Navbar() {
               alt="Profile"
               width={40}
               height={40}
-              className="rounded-full border-2 border-teal-500 cursor-pointer"
+              className="rounded-full border-2 border-teal-500 cursor-pointer shadow-md"
               onClick={() => setMenuOpen(!menuOpen)}
             />
             {/* Optional Dropdown */}
